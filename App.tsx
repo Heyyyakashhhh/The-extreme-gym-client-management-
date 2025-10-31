@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Client, Owner, PlanType } from './types';
-import { PLAN_DURATIONS_MONTHS } from './constants';
+import { PLAN_DURATIONS_MONTHS, PLAN_PRICES } from './constants';
 import { Dashboard } from './components/Dashboard';
 import { RenewalModal } from './components/RenewalModal';
 import { AddEditClientView } from './components/AddEditClientView';
@@ -153,6 +153,7 @@ const App: React.FC = () => {
                 return {
                     ...client,
                     plan_type: newPlanType,
+                    plan_price: PLAN_PRICES[newPlanType],
                     start_date: newStartDate.toISOString(),
                     end_date: newEndDate.toISOString(),
                     payment_notes: newPaymentNotes,

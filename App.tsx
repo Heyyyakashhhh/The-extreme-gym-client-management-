@@ -9,6 +9,7 @@ import { DashboardIcon, UsersIcon, SettingsIcon, CodeIcon, BellIcon } from './co
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { NotificationPopover } from './components/NotificationPopover';
 import { PersistenceInfo } from './components/PersistenceInfo';
+import { WelcomeModal } from './components/WelcomeModal';
 
 type View = 'DASHBOARD' | 'ADD_CLIENT' | 'EDIT_CLIENT' | 'SETTINGS';
 
@@ -42,6 +43,7 @@ const App: React.FC = () => {
     });
 
     const [showPersistenceInfo, setShowPersistenceInfo] = useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
     useEffect(() => {
         localStorage.setItem('gymClients', JSON.stringify(clients));
@@ -52,9 +54,14 @@ const App: React.FC = () => {
     }, [owner]);
     
     useEffect(() => {
-        const hasSeenInfo = localStorage.getItem('hasSeenPersistenceInfo');
-        if (!hasSeenInfo) {
-            setShowPersistenceInfo(true);
+        const hasSeenWelcome = localStorage.getItem('hasSeenWelcomeModal');
+        if (!hasSeenWelcome && clients.length === 0) {
+            setShowWelcomeModal(true);
+        } else {
+            const hasSeenInfo = localStorage.getItem('hasSeenPersistenceInfo');
+            if (!hasSeenInfo) {
+                setShowPersistenceInfo(true);
+            }
         }
     }, []);
 
@@ -66,7 +73,9 @@ const App: React.FC = () => {
     
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [activeSearchQuery, setActiveSearchQuery] = useState('');
+    const [expiredSearchQuery, setExpiredSearchQuery] = useState('');
+
 
     const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -86,6 +95,17 @@ const App: React.FC = () => {
     const handleDismissPersistenceInfo = () => {
         localStorage.setItem('hasSeenPersistenceInfo', 'true');
         setShowPersistenceInfo(false);
+    };
+
+    const handleContinueWelcome = () => {
+        localStorage.setItem('hasSeenWelcomeModal', 'true');
+        setShowWelcomeModal(false);
+    };
+
+    const handleGoToSettingsFromWelcome = () => {
+        localStorage.setItem('hasSeenWelcomeModal', 'true');
+        setShowWelcomeModal(false);
+        setActiveView('SETTINGS');
     };
 
     const handleOpenRenewalModal = (client: Client) => {
@@ -192,24 +212,30 @@ const App: React.FC = () => {
 
      const filteredActiveClients = useMemo(() => {
         return partitionedClients.active
-            .filter(client => client.client_name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(client => client.client_name.toLowerCase().includes(activeSearchQuery.toLowerCase()))
             .sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime());
-     }, [partitionedClients.active, searchQuery]);
+     }, [partitionedClients.active, activeSearchQuery]);
 
      const filteredExpiredClients = useMemo(() => {
         return partitionedClients.expired
-            .filter(client => client.client_name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(client => client.client_name.toLowerCase().includes(expiredSearchQuery.toLowerCase()))
             .sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
-     }, [partitionedClients.expired, searchQuery]);
+     }, [partitionedClients.expired, expiredSearchQuery]);
 
-    const { activeClientsCount, totalRevenue } = useMemo(() => {
+    const { activeClientsCount, totalRevenue, expiredRevenue, grandTotalRevenue } = useMemo(() => {
         const activeClientsList = partitionedClients.active;
-        const revenue = activeClientsList.reduce((sum, client) => sum + client.plan_price, 0);
+        const expiredClientsList = partitionedClients.expired;
+        
+        const activeRev = activeClientsList.reduce((sum, client) => sum + client.plan_price, 0);
+        const expiredRev = expiredClientsList.reduce((sum, client) => sum + client.plan_price, 0);
+
         return {
             activeClientsCount: activeClientsList.length,
-            totalRevenue: revenue,
+            totalRevenue: activeRev,
+            expiredRevenue: expiredRev,
+            grandTotalRevenue: activeRev + expiredRev,
         };
-    }, [partitionedClients.active]);
+    }, [partitionedClients.active, partitionedClients.expired]);
 
     const expiringSoonClients = useMemo(() => {
         const now = new Date();
@@ -235,8 +261,12 @@ const App: React.FC = () => {
             activeClientsCount: activeClientsCount,
             expiredClientsCount: partitionedClients.expired.length,
             totalRevenue: totalRevenue,
-            searchQuery: searchQuery,
-            onSearchChange: setSearchQuery,
+            expiredRevenue: expiredRevenue,
+            grandTotalRevenue: grandTotalRevenue,
+            activeSearchQuery: activeSearchQuery,
+            onActiveSearchChange: setActiveSearchQuery,
+            expiredSearchQuery: expiredSearchQuery,
+            onExpiredSearchChange: setExpiredSearchQuery,
         };
 
         switch (activeView) {
@@ -294,6 +324,11 @@ const App: React.FC = () => {
                 onConfirm={handleConfirmDelete}
             />
              {showPersistenceInfo && <PersistenceInfo onDismiss={handleDismissPersistenceInfo} />}
+             <WelcomeModal 
+                isOpen={showWelcomeModal}
+                onContinue={handleContinueWelcome}
+                onGoToSettings={handleGoToSettingsFromWelcome}
+            />
         </div>
     );
 };

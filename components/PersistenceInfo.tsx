@@ -11,7 +11,7 @@ export const PersistenceInfo: React.FC<PersistenceInfoProps> = ({ onDismiss }) =
       <div className="flex items-center space-x-4 max-w-4xl">
         <InformationCircleIcon className="w-8 h-8 text-blue-300 flex-shrink-0" />
         <p className="text-sm">
-          <strong>Demo Mode:</strong> This is a frontend-only application. All data is saved in your browser's local storage and will not be available on other devices. To enable shared data, please follow the backend setup guide in the Settings page.
+          <strong>Data is Stored Locally:</strong> Your data is saved only in this browser and will not appear on other devices. For cross-device sync, a backend must be configured via the Settings page.
         </p>
         <button
           onClick={onDismiss}

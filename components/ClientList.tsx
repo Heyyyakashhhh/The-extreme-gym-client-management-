@@ -35,7 +35,8 @@ const ClientListItem: React.FC<ClientListItemProps> = ({ client, onRenew, onEdit
                      <span className={`w-3 h-3 rounded-full mr-3 ${statusClasses}`}></span>
                     <h4 className="text-xl font-bold text-white">{client.client_name}</h4>
                 </div>
-                <p className="text-gray-400 text-sm">Plan Dates: <span className="font-medium text-gray-300">{startDate.toLocaleDateString()}</span> to <span className="font-medium text-gray-300">{endDate.toLocaleDateString()}</span></p>
+                <p className="text-gray-400 text-sm">Phone: <span className="font-medium text-gray-300">{client.client_phone}</span></p>
+                <p className="text-gray-400 text-sm mt-1">Plan Dates: <span className="font-medium text-gray-300">{startDate.toLocaleDateString()}</span> to <span className="font-medium text-gray-300">{endDate.toLocaleDateString()}</span></p>
                 <p className="text-gray-400 text-sm mt-1">Payment: <span className="font-semibold text-cyan-400">{client.payment_notes}</span></p>
             </div>
             <div className="flex items-center space-x-2 w-full md:w-auto">
@@ -92,7 +93,7 @@ export const ClientList: React.FC<ClientListProps> = ({ clients, onRenew, onEdit
   return (
     <>
       {clients.length > 0 ? (
-        <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {clients.map(client => (
             <ClientListItem key={client.id} client={client} onRenew={onRenew} onEdit={onEdit} onDelete={onDelete} />
           ))}

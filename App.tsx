@@ -8,6 +8,7 @@ import { SettingsView } from './components/SettingsView';
 import { DashboardIcon, UsersIcon, SettingsIcon, CodeIcon, BellIcon } from './components/Icons';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { NotificationPopover } from './components/NotificationPopover';
+import { PersistenceInfo } from './components/PersistenceInfo';
 
 type View = 'DASHBOARD' | 'ADD_CLIENT' | 'EDIT_CLIENT' | 'SETTINGS';
 
@@ -40,6 +41,8 @@ const App: React.FC = () => {
         }
     });
 
+    const [showPersistenceInfo, setShowPersistenceInfo] = useState(false);
+
     useEffect(() => {
         localStorage.setItem('gymClients', JSON.stringify(clients));
     }, [clients]);
@@ -47,6 +50,13 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('gymOwner', JSON.stringify(owner));
     }, [owner]);
+    
+    useEffect(() => {
+        const hasSeenInfo = localStorage.getItem('hasSeenPersistenceInfo');
+        if (!hasSeenInfo) {
+            setShowPersistenceInfo(true);
+        }
+    }, []);
 
     const [activeView, setActiveView] = useState<View>('DASHBOARD');
     
@@ -56,6 +66,7 @@ const App: React.FC = () => {
     
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +83,10 @@ const App: React.FC = () => {
         };
     }, []);
 
+    const handleDismissPersistenceInfo = () => {
+        localStorage.setItem('hasSeenPersistenceInfo', 'true');
+        setShowPersistenceInfo(false);
+    };
 
     const handleOpenRenewalModal = (client: Client) => {
         setSelectedClient(client);
@@ -158,22 +173,75 @@ const App: React.FC = () => {
         setOwner(newOwner);
     };
 
-    const sortedClients = useMemo(() => {
-        return [...clients].sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime());
+    const partitionedClients = useMemo(() => {
+        const now = new Date();
+        const todayUTCStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        
+        const active: Client[] = [];
+        const expired: Client[] = [];
+
+        for (const client of clients) {
+            if (new Date(client.end_date) < todayUTCStart) {
+                expired.push(client);
+            } else {
+                active.push(client);
+            }
+        }
+        return { active, expired };
     }, [clients]);
+
+     const filteredActiveClients = useMemo(() => {
+        return partitionedClients.active
+            .filter(client => client.client_name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime());
+     }, [partitionedClients.active, searchQuery]);
+
+     const filteredExpiredClients = useMemo(() => {
+        return partitionedClients.expired
+            .filter(client => client.client_name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
+     }, [partitionedClients.expired, searchQuery]);
+
+    const { activeClientsCount, totalRevenue } = useMemo(() => {
+        const activeClientsList = partitionedClients.active;
+        const revenue = activeClientsList.reduce((sum, client) => sum + client.plan_price, 0);
+        return {
+            activeClientsCount: activeClientsList.length,
+            totalRevenue: revenue,
+        };
+    }, [partitionedClients.active]);
 
     const expiringSoonClients = useMemo(() => {
         const now = new Date();
-        // Get tomorrow's date at midnight UTC to prevent timezone bugs
-        const tomorrowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-        const tomorrowStr = tomorrowUTC.toISOString().split('T')[0];
-        return clients.filter(c => c.end_date.startsWith(tomorrowStr));
-    }, [clients]);
+        const todayUTCStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        
+        const sevenDaysFromTodayUTC = new Date(todayUTCStart.getTime());
+        sevenDaysFromTodayUTC.setUTCDate(sevenDaysFromTodayUTC.getUTCDate() + 7);
+        
+        return partitionedClients.active.filter(c => {
+            const endDateObj = new Date(c.end_date);
+            return endDateObj.getTime() <= sevenDaysFromTodayUTC.getTime();
+        });
+    }, [partitionedClients.active]);
 
     const renderContent = () => {
+        const dashboardProps = {
+            activeClients: filteredActiveClients,
+            expiredClients: filteredExpiredClients,
+            onRenewClient: handleOpenRenewalModal,
+            onEditClient: handleEditClient,
+            onDeleteClient: handleOpenDeleteModal,
+            expiringSoonCount: expiringSoonClients.length,
+            activeClientsCount: activeClientsCount,
+            expiredClientsCount: partitionedClients.expired.length,
+            totalRevenue: totalRevenue,
+            searchQuery: searchQuery,
+            onSearchChange: setSearchQuery,
+        };
+
         switch (activeView) {
             case 'DASHBOARD':
-                return <Dashboard clients={sortedClients} onRenewClient={handleOpenRenewalModal} onEditClient={handleEditClient} onDeleteClient={handleOpenDeleteModal} expiringSoonCount={expiringSoonClients.length} />;
+                return <Dashboard {...dashboardProps} />;
             case 'ADD_CLIENT':
                 return <AddEditClientView key="add-client" onSave={handleSaveClient} onCancel={() => setActiveView('DASHBOARD')} existingClient={null} />;
             case 'EDIT_CLIENT':
@@ -181,7 +249,7 @@ const App: React.FC = () => {
             case 'SETTINGS':
                 return <SettingsView owner={owner} onSave={handleSaveOwner} />;
             default:
-                return <Dashboard clients={sortedClients} onRenewClient={handleOpenRenewalModal} onEditClient={handleEditClient} onDeleteClient={handleOpenDeleteModal} expiringSoonCount={expiringSoonClients.length} />;
+                return <Dashboard {...dashboardProps} />;
         }
     };
 
@@ -225,6 +293,7 @@ const App: React.FC = () => {
                 onClose={handleCloseDeleteModal}
                 onConfirm={handleConfirmDelete}
             />
+             {showPersistenceInfo && <PersistenceInfo onDismiss={handleDismissPersistenceInfo} />}
         </div>
     );
 };
@@ -233,7 +302,7 @@ interface SidebarProps {
     activeView: View;
     setActiveView: (view: View) => void;
 }
-// Fix: Removed stray `_` character which was causing a syntax error.
+
 const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
     const navItems = [
         { view: 'DASHBOARD', icon: <DashboardIcon />, label: 'Dashboard' },
